@@ -3,7 +3,9 @@ mod midi;
 
 use engine::Engine;
 
-use std::{io::Cursor};
+
+
+use std::{io::Cursor,time::Instant};
 use vulkano::{
     buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage},
     command_buffer::{
@@ -55,6 +57,7 @@ use midir::MidiInputConnection;
 use crate::fs::PushConstants;
 
 use std::mem::MaybeUninit;
+use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -124,26 +127,83 @@ fn main() {
 
 
     let mut push_constants = Arc::new(Mutex::new(PushConstants{
-        note : [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-        velocity : [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        note : [0,0,0,0,0,0,0,0],
+        velocity : [0,0,0,0,0,0,0,0],
+        time: 0,
     }));
+
+    let mut currentTime = Instant::now();
 
     let mut w_midi_push_constants = push_constants.clone();
 
     // _conn_in needs to be a named parameter, because it needs to be kept alive until the end of the scope
     let mut _conn_in = listen(move | channel, note, velocity, |{
-        /*let mut lock = push_constants.try_lock();
-        if let Ok(ref mut push_constants) = lock {
-            **push_constants.ch1_note = n;
-            **push_constants.ch1_velocity = v;
-        } else {
-            println!("try_lock failed");
-        }*/
+        // let mut lock = push_constants.try_lock();
+        // if let Ok(ref mut push_constants) = lock {
+        // **push_constants.ch1_note = n;
+        // **push_constants.ch1_velocity = v;
+        // } else {
+        // println!("try_lock failed");
+        // }
+
+        println!("DEBUG : channel[{0}] : ({1},{2})",channel,note,velocity);
+
+        if channel >= 8 {
+            return;
+        }
 
         let mut p = w_midi_push_constants.lock().unwrap();
         p.note[channel] = note;
         p.velocity[channel] = velocity;
+
     });
+
+    let descriptor_set_allocator = StandardDescriptorSetAllocator::new(engine.device.clone());
+    let command_buffer_allocator =
+        StandardCommandBufferAllocator::new(engine.device.clone(), Default::default());
+    let mut uploads = AutoCommandBufferBuilder::primary(
+        &command_buffer_allocator,
+        engine.queue.queue_family_index(),
+        CommandBufferUsage::OneTimeSubmit,
+    )
+        .unwrap();
+
+    let texture = {
+        let png_bytes = include_bytes!("Noise.png").as_slice();
+        let decoder = png::Decoder::new(png_bytes);
+        let mut reader = decoder.read_info().unwrap();
+        let info = reader.info();
+        let dimensions = ImageDimensions::Dim2d {
+            width: info.width,
+            height: info.height,
+            array_layers: 1,
+        };
+        let mut image_data = Vec::new();
+        image_data.resize((info.width as usize * info.height as usize * info.bytes_per_pixel()), 0);
+        reader.next_frame(&mut image_data).unwrap();
+
+        let image = ImmutableImage::from_iter(
+            &memory_allocator,
+            image_data,
+            dimensions,
+            MipmapsCount::One,
+            Format::R8_SRGB,
+            &mut uploads,
+        )
+            .unwrap();
+        ImageView::new_default(image).unwrap()
+    };
+
+    let sampler = Sampler::new(
+        engine.device.clone(),
+        SamplerCreateInfo {
+            mag_filter: Filter::Linear,
+            min_filter: Filter::Linear,
+            address_mode: [SamplerAddressMode::Repeat; 3],
+            ..Default::default()
+        },
+    )
+        .unwrap();
 
     let pipeline = GraphicsPipeline::start()
         .render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
@@ -153,6 +213,14 @@ fn main() {
         .viewport_state(ViewportState::viewport_dynamic_scissor_irrelevant())
         .fragment_shader(fs.entry_point("main").unwrap(), ())
         .build(engine.device.clone())
+        .unwrap();
+
+    let layout = pipeline.layout().set_layouts().get(0).unwrap();
+    let set = PersistentDescriptorSet::new(
+        &descriptor_set_allocator,
+        layout.clone(),
+        [WriteDescriptorSet::image_view_sampler(0, texture, sampler)],
+    )
         .unwrap();
 
     let mut viewport = Viewport {
@@ -166,7 +234,14 @@ fn main() {
         StandardCommandBufferAllocator::new(engine.device.clone(), Default::default());
 
     let mut recreate_swapchain = false;
-    let mut previous_frame_end = Some(sync::now(engine.device.clone()).boxed());
+    let mut previous_frame_end = Some(
+        uploads
+            .build()
+            .unwrap()
+            .execute(engine.queue.clone())
+            .unwrap()
+            .boxed(),
+    );
 
     let mut r_vulkan_push_constants = push_constants.clone();
 
@@ -238,6 +313,8 @@ fn main() {
                     .unwrap();
 
                 let mut p = r_vulkan_push_constants.lock().unwrap().clone();
+                p.time = currentTime.elapsed().as_millis() as u32;
+
                 builder
                     .begin_render_pass(
                         RenderPassBeginInfo {
@@ -252,6 +329,12 @@ fn main() {
                     .unwrap()
                     .set_viewport(0, [viewport.clone()])
                     .bind_pipeline_graphics(pipeline.clone())
+                    .bind_descriptor_sets(
+                        PipelineBindPoint::Graphics,
+                        pipeline.layout().clone(),
+                        0,
+                        set.clone(),
+                    )
                     .bind_vertex_buffers(0, vertex_buffer.clone())
                     .push_constants(pipeline.layout().clone(), 0, p)
                     .draw(vertex_buffer.len() as u32, 1, 0, 0)
@@ -282,8 +365,8 @@ fn main() {
                         previous_frame_end = Some(sync::now(engine.device.clone()).boxed());
                     }
                     Err(e) => {
-                        panic!("failed to flush future: {e}");
-                        // previous_frame_end = Some(sync::now(device.clone()).boxed());
+                        println!("failed to flush future: {e}");
+                        previous_frame_end = Some(sync::now(engine.device.clone()).boxed());
                     }
                 }
             }

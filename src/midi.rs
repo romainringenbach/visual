@@ -59,6 +59,9 @@ pub fn listen<F>( mut func: F) ->  Result<MidiInputConnection<()>, Box<dyn Error
                         ChannelVoiceMsg::NoteOn {note, velocity} => {
                             func(channel as usize, note as u32, velocity as u32);
                         }
+                        ChannelVoiceMsg::NoteOff {note, velocity} => {
+                            func(channel as usize, 0, 0);
+                        }
                         _ => println!("nothing")
                     }
                 }
