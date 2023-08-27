@@ -1,47 +1,23 @@
 use std::sync::Arc;
 use vulkano::{
-    command_buffer::{
-        allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,
-        PrimaryCommandBufferAbstract, RenderPassBeginInfo, SubpassContents,
-    },
-    descriptor_set::{
-        allocator::StandardDescriptorSetAllocator, PersistentDescriptorSet, WriteDescriptorSet,
-    },
     device::{
         physical::PhysicalDeviceType, Device, DeviceCreateInfo, DeviceExtensions, QueueCreateInfo,
         QueueFlags, Queue
     },
-    format::Format,
     image::{
-        view::ImageView, ImageAccess, ImageDimensions, ImageUsage, ImmutableImage, MipmapsCount,
-        SwapchainImage,
+        ImageUsage, SwapchainImage,
     },
     instance::{Instance, InstanceCreateInfo, InstanceExtensions},
-    memory::allocator::{AllocationCreateInfo, MemoryUsage, StandardMemoryAllocator},
-    pipeline::{
-        graphics::{
-            color_blend::ColorBlendState,
-            input_assembly::{InputAssemblyState, PrimitiveTopology},
-            vertex_input::Vertex,
-            viewport::{Viewport, ViewportState},
-        },
-        GraphicsPipeline, Pipeline, PipelineBindPoint,
-    },
-    render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass},
-    sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
     swapchain::{
-        AcquireError, Swapchain, SwapchainCreateInfo, SwapchainCreationError,
-        SwapchainPresentInfo,
+        Swapchain, SwapchainCreateInfo
     },
-    sync::{self, FlushError, GpuFuture},
     VulkanLibrary,
 };
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::swapchain::Surface;
 use vulkano_win::{VkSurfaceBuild};
 use winit::{
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::{EventLoop},
     window::{Window, WindowBuilder},
 };
 
@@ -178,7 +154,7 @@ impl Engine {
         let ( physical_device, queue_family_index) = Self::init_physical_device(&instance,&device_extensions,&surface);
         let (device, queue) = Self::init_device_and_queue(&physical_device,&device_extensions,queue_family_index);
 
-        let (mut swapchain, images) = Self::init_swapchain(&device,&surface);
+        let (swapchain, images) = Self::init_swapchain(&device,&surface);
 
         Self {
             event_loop,

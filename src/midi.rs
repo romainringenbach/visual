@@ -1,7 +1,6 @@
 use std::io::{stdin, stdout, Write};
-use midir::{MidiInput, Ignore, MidiInputConnection, ConnectError};
+use midir::{MidiInput, Ignore, MidiInputConnection};
 use midi_msg::*;
-use std::mem::MaybeUninit;
 use std::error::Error;
 
 
@@ -42,7 +41,7 @@ pub fn listen<F>( mut func: F) ->  Result<MidiInputConnection<()>, Box<dyn Error
     };
 
     println!("\nOpening connection");
-    let in_port_name = midi_in.port_name(in_port)?;
+    let _in_port_name = midi_in.port_name(in_port)?;
 
     let _conn_in = midi_in.connect(in_port, "midir-read-input", move |stamp, midi_bytes, _| {
         //println!("{}: {:?} (len = {})", stamp, message, message.len());
@@ -59,7 +58,7 @@ pub fn listen<F>( mut func: F) ->  Result<MidiInputConnection<()>, Box<dyn Error
                         ChannelVoiceMsg::NoteOn {note, velocity} => {
                             func(channel as usize, note as u32, velocity as u32);
                         }
-                        ChannelVoiceMsg::NoteOff {note, velocity} => {
+                        ChannelVoiceMsg::NoteOff {note: _, velocity: _} => {
                             func(channel as usize, 0, 0);
                         }
                         _ => println!("nothing")
