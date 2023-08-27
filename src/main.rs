@@ -6,6 +6,6 @@ mod midi;
 mod project1;
 
 fn main() {
-    rendering::run(project1::PROJECT.as_ref());
+    rendering::run(project1::PROJECT.clone());
 }
 

@@ -43,7 +43,7 @@ use vs::PushConstants;
 
 use std::sync::{Arc, Mutex};
 
-pub fn run(project : &Project) {
+pub fn run(project : Arc<Mutex<Project>>) {
     let mut engine = Engine::new();
 
     let memory_allocator = StandardMemoryAllocator::new_default(engine.device.clone());
@@ -104,30 +104,41 @@ pub fn run(project : &Project) {
         .unwrap();
 
     let vs = vs::load(engine.device.clone()).unwrap();
-    let fs = (project.frag_loader)(engine.device.clone()).unwrap();
+
+
+    let mut fs;
+    {
+        let f_project = project.lock().unwrap();
+        fs = (f_project.frag_loader)(engine.device.clone()).unwrap();
+    }
 
     let push_constants = Arc::new(Mutex::new(PushConstants{
-        note : [0,0,0,0,0,0,0,0],
-        velocity : [0,0,0,0,0,0,0,0],
         time: 0,
+        deltaTime: 0,
+        midiData: [0;8],
+        data: [0.0;22],
     }));
+
+    let midi_notes = Arc::new(Mutex::new([0;16]));
+    let midi_velocities = Arc::new(Mutex::new([0;16]));
 
     let current_time = Instant::now();
 
-    let w_midi_push_constants = push_constants.clone();
+    let w_midi_notes = midi_notes.clone();
+    let w_midi_velocities = midi_velocities.clone();
 
     // _conn_in needs to be a named parameter, because it needs to be kept alive until the end of the scope
     let mut _conn_in = listen(move | channel, note, velocity, |{
-        println!("DEBUG : channel[{0}] : ({1},{2})",channel,note,velocity);
+        //println!("DEBUG : channel[{0}] : ({1},{2})",channel,note,velocity);
 
-        if channel >= 8 {
+        if channel >= 16 {
             return;
         }
 
-        let mut p = w_midi_push_constants.lock().unwrap();
-        p.note[channel] = note;
-        p.velocity[channel] = velocity;
-
+        let mut n = w_midi_notes.lock().unwrap();
+        let mut v = w_midi_velocities.lock().unwrap();
+        n[channel] = note;
+        v[channel] = velocity;
     });
 
     let descriptor_set_allocator = StandardDescriptorSetAllocator::new(engine.device.clone());
@@ -216,6 +227,9 @@ pub fn run(project : &Project) {
     );
 
     let r_vulkan_push_constants = push_constants.clone();
+    let r_midi_notes = midi_notes.clone();
+    let r_midi_velocities = midi_velocities.clone();
+    let r_project = project.clone();
 
     engine.event_loop.run(move |event, _, control_flow| {
         match event {
@@ -285,7 +299,22 @@ pub fn run(project : &Project) {
                     .unwrap();
 
                 let mut p = r_vulkan_push_constants.lock().unwrap().clone();
-                p.time = current_time.elapsed().as_millis() as u32;
+                let tmp_elapsed_time = current_time.elapsed().as_millis() as u32;
+                p.deltaTime = tmp_elapsed_time - p.time;
+                p.time = tmp_elapsed_time;
+
+                let n = r_midi_notes.lock().unwrap().clone();
+                let v = r_midi_velocities.lock().unwrap().clone();
+
+                let pr = r_project.lock().unwrap();
+
+                (pr.update)(p.time,p.deltaTime,n.clone(),v.clone(),&mut p.data);
+
+                let bit_enc: [u32;4] = [1,255,65025,16581375];
+
+                for i in 0..7{
+                    p.midiData[i] = n[i*2] as u32 * bit_enc[0] + v[i*2] as u32 * bit_enc[1] + n[i*2+1] as u32 * bit_enc[2] + v[i*2+1] as u32 * bit_enc[3];
+                }
 
                 builder
                     .begin_render_pass(

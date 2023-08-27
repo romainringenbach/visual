@@ -7,7 +7,7 @@ use std::error::Error;
 //ch1_note : &'static mut i32, ch1_velocity: &'static mut i32
 
 pub fn listen<F>( mut func: F) ->  Result<MidiInputConnection<()>, Box<dyn Error>>
-    where F : FnMut(usize, u32, u32) + Send + 'static // index, note and velocity
+    where F : FnMut(usize, u8, u8) + Send + 'static // index, note and velocity
 {
     let mut midi_in;
     let in_port;
@@ -56,7 +56,7 @@ pub fn listen<F>( mut func: F) ->  Result<MidiInputConnection<()>, Box<dyn Error
                 MidiMsg::ChannelVoice {channel, msg} => {
                     match msg {
                         ChannelVoiceMsg::NoteOn {note, velocity} => {
-                            func(channel as usize, note as u32, velocity as u32);
+                            func(channel as usize, note, velocity);
                         }
                         ChannelVoiceMsg::NoteOff {note: _, velocity: _} => {
                             func(channel as usize, 0, 0);

@@ -21,31 +21,33 @@ float rand(vec2 co){
 
 void main() {
 
+    uint iTime = getTime();
+
     float ya = 0;
     if(iPosition.y > 0.0){
         ya = 0.5;
     }
 
     float sizeFactor = 1.0;
-    if(iNotes[1] > 0){
+    if(getNote(1) > 0){
         sizeFactor = 4.0;
     }
 
-    if(iNotes[2] > 0){
+    if(getNote(2) > 0){
         speed = 0.00005;
     }
 
-    if(iNotes[3] > 0){
+    if(getNote(3) > 0){
         sizeFactor = 0.25;
     }
 
-    if(iNotes[4] > 0){
+    if(getNote(4) > 0){
         sizeFactor = 0.1;
     }
 
     float c = round(texture(tex,vec2(iTexCoord.x * baseSize / sizeFactor,iTime * speed + ya)).r);
 
-    if(iNotes[0] > 0){
+    if(getNote(0) > 0){
         c = 0;
     }
 
