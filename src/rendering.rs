@@ -308,6 +308,8 @@ pub fn run(project : Arc<Mutex<Project>>) {
 
                 let pr = r_project.lock().unwrap();
 
+                p.data[0] = dimensions.width as f32;
+                p.data[1] = dimensions.height as f32;
                 (pr.update)(p.time,p.deltaTime,n.clone(),v.clone(),&mut p.data);
 
                 let bit_enc: [u32;4] = [1,255,65025,16581375];
