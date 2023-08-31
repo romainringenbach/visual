@@ -123,6 +123,7 @@ pub fn run(project : Arc<Mutex<Project>>) {
     let midi_velocities = Arc::new(Mutex::new([0;16]));
 
     let current_time = Instant::now();
+    let previous_time = Arc::new(Mutex::new(0));
 
     let w_midi_notes = midi_notes.clone();
     let w_midi_velocities = midi_velocities.clone();
@@ -230,6 +231,7 @@ pub fn run(project : Arc<Mutex<Project>>) {
     let r_midi_notes = midi_notes.clone();
     let r_midi_velocities = midi_velocities.clone();
     let r_project = project.clone();
+    let r_previousTime = previous_time.clone();
 
     engine.event_loop.run(move |event, _, control_flow| {
         match event {
@@ -300,7 +302,9 @@ pub fn run(project : Arc<Mutex<Project>>) {
 
                 let mut p = r_vulkan_push_constants.lock().unwrap().clone();
                 let tmp_elapsed_time = current_time.elapsed().as_millis() as u32;
-                p.deltaTime = tmp_elapsed_time - p.time;
+                let mut previous_time_l = r_previousTime.lock().unwrap();
+                p.deltaTime = tmp_elapsed_time - *previous_time_l;
+                *previous_time_l = tmp_elapsed_time;
                 p.time = tmp_elapsed_time;
 
                 let n = r_midi_notes.lock().unwrap().clone();

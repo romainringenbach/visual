@@ -26,12 +26,12 @@ uint getVelocity(int index){
 }
 
 float getData(int index){
-    if(index >= 0 && index < 16){
+    if(index >= 0 && index < 22){
         if(index <= 1){
             return iData[8][index+2];
         } else {
 
-            return iData[9+(index-2)/4][index % 4];
+            return iData[9+(index-2)/4][(index-2) % 4];
 
         }
     }
@@ -44,4 +44,8 @@ int getTime(){
 
 int getDeltaTime(){
     return int(iData[8][1]);
+}
+
+float rand(vec2 co){
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
 }

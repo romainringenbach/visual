@@ -14,11 +14,6 @@
 const float baseSize = 0.1;
 float speed = 0.00001;
 
-float rand(vec2 co){
-    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
-}
-
-
 void main() {
 
     uint iTime = getTime();
