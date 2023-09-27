@@ -43,14 +43,14 @@ pub fn listen<F>( mut func: F) ->  Result<MidiInputConnection<()>, Box<dyn Error
     println!("\nOpening connection");
     let _in_port_name = midi_in.port_name(in_port)?;
 
-    let _conn_in = midi_in.connect(in_port, "midir-read-input", move |stamp, midi_bytes, _| {
+    let _conn_in = midi_in.connect(in_port, "midir-read-input", move |_stamp, midi_bytes, _| {
         //println!("{}: {:?} (len = {})", stamp, message, message.len());
         let (msg, _len) = MidiMsg::from_midi_with_context(&midi_bytes, &mut ctx).expect("Not an error");
         // Print everything but spammy clock messages.
         if let MidiMsg::SystemRealTime{ msg: SystemRealTimeMsg::TimingClock } = msg {
             // no-op
         } else {
-            println!("{}: {:?}", stamp, msg);
+            //println!("{}: {:?}", stamp, msg);
 
             match msg {
                 MidiMsg::ChannelVoice {channel, msg} => {

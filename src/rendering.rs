@@ -3,7 +3,9 @@ use crate::project::Project;
 
 use std::{time::Instant};
 use vulkano::{
-    buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage},
+    buffer::{
+        Buffer, BufferContents, BufferCreateInfo, BufferUsage,
+    },
     command_buffer::{
         allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,
         PrimaryCommandBufferAbstract, RenderPassBeginInfo, SubpassContents,
@@ -42,11 +44,14 @@ use crate::midi::listen;
 use vs::PushConstants;
 
 use std::sync::{Arc, Mutex};
+use crate::uniform_register::UniformRegister;
 
 pub fn run(project : Arc<Mutex<Project>>) {
     let mut engine = Engine::new();
 
-    let memory_allocator = StandardMemoryAllocator::new_default(engine.device.clone());
+    let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(engine.device.clone()));
+
+    let uniform_register = Arc::new(Mutex::new(UniformRegister::new(memory_allocator.clone())));
 
     // We now create a buffer that will store the shape of our triangle. We use `#[repr(C)]` here
     // to force rustc to use a defined layout for our data, as the default representation has *no
@@ -106,7 +111,7 @@ pub fn run(project : Arc<Mutex<Project>>) {
     let vs = vs::load(engine.device.clone()).unwrap();
 
 
-    let mut fs;
+    let fs;
     {
         let f_project = project.lock().unwrap();
         fs = (f_project.frag_loader)(engine.device.clone()).unwrap();
@@ -143,6 +148,7 @@ pub fn run(project : Arc<Mutex<Project>>) {
     });
 
     let descriptor_set_allocator = StandardDescriptorSetAllocator::new(engine.device.clone());
+    let descriptor_set_allocator2 = StandardDescriptorSetAllocator::new(engine.device.clone());
     let command_buffer_allocator =
         StandardCommandBufferAllocator::new(engine.device.clone(), Default::default());
     let mut uploads = AutoCommandBufferBuilder::primary(
@@ -199,13 +205,6 @@ pub fn run(project : Arc<Mutex<Project>>) {
         .build(engine.device.clone())
         .unwrap();
 
-    let layout = pipeline.layout().set_layouts().get(0).unwrap();
-    let set = PersistentDescriptorSet::new(
-        &descriptor_set_allocator,
-        layout.clone(),
-        [WriteDescriptorSet::image_view_sampler(0, texture, sampler)],
-    )
-        .unwrap();
 
     let mut viewport = Viewport {
         origin: [0.0, 0.0],
@@ -231,7 +230,10 @@ pub fn run(project : Arc<Mutex<Project>>) {
     let r_midi_notes = midi_notes.clone();
     let r_midi_velocities = midi_velocities.clone();
     let r_project = project.clone();
-    let r_previousTime = previous_time.clone();
+    let r_previous_time = previous_time.clone();
+
+    let r_uniform_register = uniform_register.clone();
+
 
     engine.event_loop.run(move |event, _, control_flow| {
         match event {
@@ -302,7 +304,7 @@ pub fn run(project : Arc<Mutex<Project>>) {
 
                 let mut p = r_vulkan_push_constants.lock().unwrap().clone();
                 let tmp_elapsed_time = current_time.elapsed().as_millis() as u32;
-                let mut previous_time_l = r_previousTime.lock().unwrap();
+                let mut previous_time_l = r_previous_time.lock().unwrap();
                 p.deltaTime = tmp_elapsed_time - *previous_time_l;
                 *previous_time_l = tmp_elapsed_time;
                 p.time = tmp_elapsed_time;
@@ -314,13 +316,29 @@ pub fn run(project : Arc<Mutex<Project>>) {
 
                 p.data[0] = dimensions.width as f32;
                 p.data[1] = dimensions.height as f32;
-                (pr.update)(p.time,p.deltaTime,n.clone(),v.clone(),&mut p.data);
+
+                let mut l_uniform_register = r_uniform_register.lock().unwrap();
+
+                (pr.update)(p.time,p.deltaTime,n.clone(),v.clone(),&mut p.data, &mut *l_uniform_register);
 
                 let bit_enc: [u32;4] = [1,255,65025,16581375];
 
                 for i in 0..7{
                     p.midiData[i] = n[i*2] as u32 * bit_enc[0] + v[i*2] as u32 * bit_enc[1] + n[i*2+1] as u32 * bit_enc[2] + v[i*2+1] as u32 * bit_enc[3];
                 }
+
+                let layout = pipeline.layout().set_layouts().get(0).unwrap();
+                let layout2 = pipeline.layout().set_layouts().get(1).unwrap();
+
+                let set = PersistentDescriptorSet::new(
+                    &descriptor_set_allocator,
+                    layout.clone(),
+                    [WriteDescriptorSet::image_view_sampler(0, texture.clone(), sampler.clone())],
+                )
+                    .unwrap();
+                let set2 = l_uniform_register.create_descriptor_set(&descriptor_set_allocator, layout2.clone());
+
+
 
                 builder
                     .begin_render_pass(
@@ -341,6 +359,11 @@ pub fn run(project : Arc<Mutex<Project>>) {
                         pipeline.layout().clone(),
                         0,
                         set.clone(),
+                    ).bind_descriptor_sets(
+                        PipelineBindPoint::Graphics,
+                        pipeline.layout().clone(),
+                        1,
+                        set2.clone(),
                     )
                     .bind_vertex_buffers(0, vertex_buffer.clone())
                     .push_constants(pipeline.layout().clone(), 0, p)

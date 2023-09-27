@@ -3,10 +3,11 @@ mod rendering;
 mod engine;
 mod midi;
 
-mod project2;
 mod utils;
+mod project3;
+mod uniform_register;
 
 fn main() {
-    rendering::run(project2::PROJECT.clone());
+    rendering::run(project3::PROJECT.clone());
 }
 

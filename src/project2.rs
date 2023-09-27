@@ -1,71 +1,105 @@
-use std::cmp::{max, min};
 use std::f32::consts::PI;
-use std::sync::mpsc::channel;
 use crate::create_project;
 use crate::utils;
-static wanted_rotation: Lazy<Arc<Mutex<f32>>> = Lazy::new(||{Arc::new(Mutex::new(0.0))});
-static old_rotation: Lazy<Arc<Mutex<f32>>> = Lazy::new(||{Arc::new(Mutex::new(0.0))});
 
-static cumulate_rotation_time: Lazy<Arc<Mutex<f32>>> = Lazy::new(||{Arc::new(Mutex::new(0.0))});
-static rotation_time : f32 = 2.0;
-static rotation_delta : f32 = PI/2.0;
+struct Rotation {
+    rotation : f32,
+    wanted_rotation : f32,
+    old_rotation : f32,
+    cumulate_rotation_over_time : f32,
+    rotation_time : f32,
+    rotation_delta : f32
+}
 
-static rotation: Lazy<Arc<Mutex<f32>>> = Lazy::new(||{Arc::new(Mutex::new(0.0))});
-static ch1_off: Lazy<Arc<Mutex<bool>>> = Lazy::new(||{Arc::new(Mutex::new(true))});
-static ch2_off: Lazy<Arc<Mutex<bool>>> = Lazy::new(||{Arc::new(Mutex::new(true))});
+impl Rotation {
+    fn update(&mut self, delta_time : f32){
+        if self.wanted_rotation != self.rotation {
+            self.cumulate_rotation_over_time += delta_time;
 
-create_project!("src/frag2.glsl",|time,delta_time, notes, velocities, data |{
+            let v = self.rotation_delta * utils::ease_in_out(self.cumulate_rotation_over_time/self.rotation_time);
+            if self.wanted_rotation > self.old_rotation {
+                self.rotation = f32::min(self.old_rotation + v, self.wanted_rotation)
+            } else if self.wanted_rotation < self.old_rotation {
+                self.rotation = f32::max(self.old_rotation - v, self.wanted_rotation)
+            }
+        }
+    }
+}
+
+
+static ROTATION_TIME : f32 = 1.0;
+static ROTATION_DELTA : f32 = PI/2.0;
+
+static ROTATION : Lazy<Arc<Mutex<Vec<Rotation>>>> = Lazy::new(||{Arc::new(Mutex::new(
+
+    vec![Rotation {
+        rotation: 0.0,
+        wanted_rotation: 0.0,
+        old_rotation: 0.0,
+        cumulate_rotation_over_time: 0.0,
+        rotation_time : ROTATION_TIME,
+        rotation_delta : ROTATION_DELTA
+    },Rotation {
+        rotation: 0.0,
+        wanted_rotation: 0.0,
+        old_rotation: 0.0,
+        cumulate_rotation_over_time: 0.0,
+        rotation_time : ROTATION_TIME,
+        rotation_delta : ROTATION_DELTA
+    },Rotation {
+        rotation: 0.0,
+        wanted_rotation: 0.0,
+        old_rotation: 0.0,
+        cumulate_rotation_over_time: 0.0,
+        rotation_time : ROTATION_TIME,
+        rotation_delta : ROTATION_DELTA
+    },Rotation {
+        rotation: 0.0,
+        wanted_rotation: 0.0,
+        old_rotation: 0.0,
+        cumulate_rotation_over_time: 0.0,
+        rotation_time : ROTATION_TIME,
+        rotation_delta : ROTATION_DELTA
+    }]
+
+))});
+
+static CH_OFF: Lazy<Arc<Mutex<Vec<bool>>>> = Lazy::new(||{Arc::new(Mutex::new(vec![true,true,true,true]))});
+
+create_project!("src/frag2.glsl",|time,delta_time, notes, _velocities, data, _uniform_register |{
     // do nothing
     let _t = time;
     let _dt = delta_time;
 
-    let mut wanted_rotation_l = wanted_rotation.lock().unwrap();
-    let mut cumulate_rotation_time_l = cumulate_rotation_time.lock().unwrap();
-    let mut old_rotation_l = old_rotation.lock().unwrap();
-    let mut rotation_l = rotation.lock().unwrap();
-    let mut ch1_off_l = ch1_off.lock().unwrap();
-    let mut ch2_off_l = ch2_off.lock().unwrap();
+    let mut rotation_l = ROTATION.lock().unwrap();
+    let mut ch_off_l = CH_OFF.lock().unwrap();
 
-    if(notes[0] > 0 && *ch1_off_l ){
-        if(*wanted_rotation_l != *rotation_l){
-            *rotation_l = *old_rotation_l;
-        } else {
-            *old_rotation_l = *rotation_l;
-            *wanted_rotation_l += rotation_delta;
+    let mut i = 0;
+    for  rotation_i in rotation_l.iter_mut() {
+        if notes[i] > 0 && ch_off_l[i] && rotation_i.rotation == rotation_i.wanted_rotation {
+            rotation_i.old_rotation = rotation_i.rotation;
+            if i%2 == 0 {
+                rotation_i.wanted_rotation += rotation_i.rotation_delta;
+            } else {
+                rotation_i.wanted_rotation -= rotation_i.rotation_delta;
+            }
+            rotation_i.cumulate_rotation_over_time = 0.0;
+            ch_off_l[i] = false;
+        } else if notes[i] == 0 {
+            ch_off_l[i] = true;
         }
-        *cumulate_rotation_time_l = 0.0;
-        *ch1_off_l = false;
-    } else if(notes[0] == 0){
-        *ch1_off_l = true;
+
+        i+= 1;
     }
 
-    if(notes[1] > 0 && *ch2_off_l ){
-        if(*wanted_rotation_l != *rotation_l){
-            *rotation_l = *old_rotation_l;
-        } else {
-            *old_rotation_l = *rotation_l;
-            *wanted_rotation_l -= rotation_delta;
-        }
-        *cumulate_rotation_time_l = 0.0;
-        *ch2_off_l = false;
-    } else if(notes[0] == 0){
-        *ch2_off_l = true;
+    let delta_time_as_seconds = (delta_time as f32)/1000.0;
+
+    i = 0;
+    for rotation_i in rotation_l.iter_mut(){
+        rotation_i.update(delta_time_as_seconds);
+        data[2+i] = rotation_i.rotation;
+        i+=1;
     }
 
-    let dtAsS = (delta_time as f32)/1000.0;
-
-    if(*wanted_rotation_l != *rotation_l){
-        *cumulate_rotation_time_l += dtAsS;
-
-        let v = rotation_delta * utils::easeInOut(*cumulate_rotation_time_l/rotation_time);
-        if(*wanted_rotation_l > *rotation_l){
-            *rotation_l = f32::min(*rotation_l + v, *wanted_rotation_l)
-        } else if(*wanted_rotation_l < *rotation_l){
-            *rotation_l = f32::max(*rotation_l - v, *wanted_rotation_l)
-        }
-    }
-
-    data[2] = *rotation_l;
-
-    //println!("Debug: {0} {1} {2} {3} {4} {5}", notes[0], notes[1], data[2], delta_time, *wanted_rotation_l, *cumulate_rotation_time_l );
+    //println!("Debug: {0} {1} {2} {3} {4} {5}", notes[0], notes[1], data[2], delta_time, rotation_1_l.wanted_rotation, rotation_1_l.cumulate_rotation_over_time );
 });

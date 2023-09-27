@@ -2,11 +2,12 @@
 use vulkano::device::Device;
 use std::sync::{Arc};
 use vulkano::shader::{ShaderCreationError, ShaderModule};
+use crate::uniform_register::UniformRegister;
 
 pub struct Project
 {
     pub frag_loader : fn(Arc<Device>) -> Result<Arc<ShaderModule>,ShaderCreationError>,
-    pub update : fn(u32,u32,[u8;16],[u8;16],& mut [f32;22]) // time, deltaTime, midi data, push constant available data array
+    pub update : fn(u32,u32,[u8;16],[u8;16],& mut [f32;22], & mut UniformRegister) // time, deltaTime, midi data, push constant available data array
 }
 
 #[macro_export]
