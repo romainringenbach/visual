@@ -43,10 +43,11 @@ use winit::{
 use crate::midi::listen;
 use vs::PushConstants;
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
+use vulkano::descriptor_set::layout::DescriptorSetLayout;
 use crate::uniform_register::UniformRegister;
 
-pub fn run(project : Arc<Mutex<Project>>) {
+pub fn run(project : Arc<RwLock<Project>>) {
     let mut engine = Engine::new();
 
     let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(engine.device.clone()));
@@ -113,7 +114,7 @@ pub fn run(project : Arc<Mutex<Project>>) {
 
     let fs;
     {
-        let f_project = project.lock().unwrap();
+        let f_project = project.read().unwrap();
         fs = (f_project.frag_loader)(engine.device.clone()).unwrap();
     }
 
@@ -148,7 +149,6 @@ pub fn run(project : Arc<Mutex<Project>>) {
     });
 
     let descriptor_set_allocator = StandardDescriptorSetAllocator::new(engine.device.clone());
-    let descriptor_set_allocator2 = StandardDescriptorSetAllocator::new(engine.device.clone());
     let command_buffer_allocator =
         StandardCommandBufferAllocator::new(engine.device.clone(), Default::default());
     let mut uploads = AutoCommandBufferBuilder::primary(
@@ -312,7 +312,7 @@ pub fn run(project : Arc<Mutex<Project>>) {
                 let n = r_midi_notes.lock().unwrap().clone();
                 let v = r_midi_velocities.lock().unwrap().clone();
 
-                let pr = r_project.lock().unwrap();
+                let pr = r_project.write().unwrap();
 
                 p.data[0] = dimensions.width as f32;
                 p.data[1] = dimensions.height as f32;
@@ -328,7 +328,6 @@ pub fn run(project : Arc<Mutex<Project>>) {
                 }
 
                 let layout = pipeline.layout().set_layouts().get(0).unwrap();
-                let layout2 = pipeline.layout().set_layouts().get(1).unwrap();
 
                 let set = PersistentDescriptorSet::new(
                     &descriptor_set_allocator,
@@ -336,9 +335,14 @@ pub fn run(project : Arc<Mutex<Project>>) {
                     [WriteDescriptorSet::image_view_sampler(0, texture.clone(), sampler.clone())],
                 )
                     .unwrap();
-                let set2 = l_uniform_register.create_descriptor_set(&descriptor_set_allocator, layout2.clone());
 
+                let layout2 : &Arc<DescriptorSetLayout>;
+                let mut set2 : Option<Arc<PersistentDescriptorSet>> = Option::None;
 
+                if l_uniform_register.has_uniform_data(){
+                    layout2 = pipeline.layout().set_layouts().get(1).unwrap();
+                    set2 = Option::Some(l_uniform_register.create_descriptor_set(&descriptor_set_allocator, layout2.clone()));
+                }
 
                 builder
                     .begin_render_pass(
@@ -359,13 +363,18 @@ pub fn run(project : Arc<Mutex<Project>>) {
                         pipeline.layout().clone(),
                         0,
                         set.clone(),
-                    ).bind_descriptor_sets(
+                    );
+
+                if set2.is_some(){
+                    builder.bind_descriptor_sets(
                         PipelineBindPoint::Graphics,
                         pipeline.layout().clone(),
                         1,
-                        set2.clone(),
-                    )
-                    .bind_vertex_buffers(0, vertex_buffer.clone())
+                        set2.unwrap().clone(),
+                    );
+                }
+
+                builder.bind_vertex_buffers(0, vertex_buffer.clone())
                     .push_constants(pipeline.layout().clone(), 0, p)
                     .draw(vertex_buffer.len() as u32, 1, 0, 0)
                     .unwrap()

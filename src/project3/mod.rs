@@ -115,7 +115,7 @@ static OLD_CH_OFF: Lazy<Arc<Mutex<Vec<bool>>>> = Lazy::new(||{Arc::new(Mutex::ne
 
 static K: Lazy<Arc<Mutex<u8>>> = Lazy::new(||{Arc::new(Mutex::new(0))});
 
-create_project!("src/frag3.glsl",|_time,delta_time, notes, _velocities, _data, uniform_register |{
+create_project!("Project 3","src/project3/frag.glsl",|_time,delta_time, notes, _velocities, _data, uniform_register |{
     // do nothing
     
     let mut extension_l = EXTENSIONS.lock().unwrap();
@@ -151,7 +151,7 @@ create_project!("src/frag3.glsl",|_time,delta_time, notes, _velocities, _data, u
             ch_off_l[l] = false;
         }
 
-        if(notes[l] == 0){
+        if notes[l] == 0 {
             ch_off_l[l] = true;
         }
         i+= 1;
