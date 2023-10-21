@@ -2,7 +2,7 @@
 
 #include <common.glsl>
 
-layout(set = 1, binding = 0) uniform Data {
+layout(set = 2, binding = 0) uniform Data {
     vec4 circleData[7];
 } uniforms;
 
@@ -34,6 +34,25 @@ bool isWhite(float length2, int type, vec2 center, vec2 screenSize, float time){
             float c = round(texture(tex,vec2(angleP,time)).r);
 
             return c == 1.0;
+        } else if(type == 3){
+
+            if(length(realPos-center) >= length2-0.01 || (length(realPos-center) >= length2/2.0-0.01 && length(realPos-center) <= length2/2.0+0.01)){
+                return true;
+            }
+
+        } else if(type == 4){
+            float angle = acos(dot(normalize(realPos-center),normalize(right)));
+            if(realPos.y >= 0){
+                angle = radians(360) - angle;
+            }
+            float angleP = angle / radians(360);
+            float c = round(texture(tex,vec2(angleP,time)*0.5).r);
+
+            if(length(realPos-center) >= length2/2.0){
+                c = round(texture(tex,vec2(angleP,-time)).r);
+            }
+
+            return c == 1.0;
         }
     }
 
@@ -43,14 +62,12 @@ bool isWhite(float length2, int type, vec2 center, vec2 screenSize, float time){
 
 void main() {
 
-    uint iTime = getTime();
+    uint iTime = common_data.time;
 
     float c = 0.0;
-    vec2 r = vec2(getData(0),getData(1));
+    vec2 r = common_data.screenSize;
 
     for (int i = 0; i < 7 ; i++){
-        float note = getNote(i);
-
         vec4 dd = uniforms.circleData[i];
 
         float length = dd[0];

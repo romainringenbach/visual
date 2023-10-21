@@ -66,7 +66,7 @@ static ROTATION : Lazy<Arc<Mutex<Vec<Rotation>>>> = Lazy::new(||{Arc::new(Mutex:
 
 static CH_OFF: Lazy<Arc<Mutex<Vec<bool>>>> = Lazy::new(||{Arc::new(Mutex::new(vec![true,true,true,true]))});
 
-create_project!("Project 2","src/project2/frag.glsl",|time,delta_time, notes, _velocities, data, _uniform_register |{
+create_project!("Project 2","src/project2/frag.glsl",|time,delta_time, notes, velocities, uniform_register |{
     // do nothing
     let _t = time;
     let _dt = delta_time;
@@ -76,7 +76,7 @@ create_project!("Project 2","src/project2/frag.glsl",|time,delta_time, notes, _v
 
     let mut i = 0;
     for  rotation_i in rotation_l.iter_mut() {
-        if notes[i] > 0 && ch_off_l[i] && rotation_i.rotation == rotation_i.wanted_rotation {
+        if velocities[i] > 0 && ch_off_l[i] && rotation_i.rotation == rotation_i.wanted_rotation {
             rotation_i.old_rotation = rotation_i.rotation;
             if i%2 == 0 {
                 rotation_i.wanted_rotation += rotation_i.rotation_delta;
@@ -85,7 +85,7 @@ create_project!("Project 2","src/project2/frag.glsl",|time,delta_time, notes, _v
             }
             rotation_i.cumulate_rotation_over_time = 0.0;
             ch_off_l[i] = false;
-        } else if notes[i] == 0 {
+        } else if velocities[i] == 0 {
             ch_off_l[i] = true;
         }
 
@@ -94,11 +94,20 @@ create_project!("Project 2","src/project2/frag.glsl",|time,delta_time, notes, _v
 
     let delta_time_as_seconds = (delta_time as f32)/1000.0;
 
+    use vulkano::padded::Padded;
+    let mut data2 : [Padded<f32, 12>;4] = [Padded(0.),Padded(0.),Padded(0.),Padded(0.)];
     i = 0;
     for rotation_i in rotation_l.iter_mut(){
         rotation_i.update(delta_time_as_seconds);
-        data[2+i] = rotation_i.rotation;
+        data2[i] = Padded(rotation_i.rotation);
         i+=1;
     }
+
+    let uniform_data = fs::Data {
+        rotations : data2,
+    };
+
+    uniform_register.register_uniform_data(uniform_data);
+
 
 });

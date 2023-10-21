@@ -2,6 +2,10 @@
 
 #include <common.glsl>
 
+layout(set = 2, binding = 0) uniform Data {
+    float rotations[4];
+} uniforms;
+
 const float basesizeX = 0.1;
 float speed = 0.001;
 
@@ -80,34 +84,17 @@ const int circleAngle[10] = {2,4,3,2,5,4,2,5,3,4};
 
 void main() {
 
-    float t = getTime()*speed;
-
+    float t = common_data.time*speed;
     vec4 dummy = texture(tex,iTexCoord);
-
-    vec3 c;
-    float l,z=t;
-    vec2 r = vec2(getData(0),getData(1));
-
-    float rAngle = getData(2);
-    mat2 rotationMat = mat2(cos(rAngle),sin(rAngle),-sin(rAngle),cos(rAngle));
-
-    vec2 coord = iTexCoord;
-    float sin_factor = sin(rAngle);
-    float cos_factor = cos(rAngle);
-    coord = vec2((coord.x - 0.5) * (r.x / r.y), coord.y - 0.5) * mat2(cos_factor, sin_factor, -sin_factor, cos_factor);
-    coord += 0.5;
-
-
-
-    bool isOnCircle1 = isInCircleArc(getData(2),0.1,radians(180.0)/2.0,0.3,iPosition,r);
+    vec2 r = common_data.screenSize;
 
     bool findCircle = false;
     int circleIndex = -1;
     float startAngle = 0.0;
     for(int i = 0; i < 10 && !findCircle ; i++){
-        startAngle = getData(circleAngle[i])+circleStart[i];
-        bool isLeft = getData(circleAngle[circleIndex])+circleStart[circleIndex] > radians(90) && getData(circleAngle[circleIndex])+circleStart[circleIndex] < radians(270);
-        if(getNote(circleAngle[circleIndex]) > 0 && ((isLeft && getNote(4) > 0) || (!isLeft && getNote(5) > 0)) ){
+        startAngle = uniforms.rotations[circleAngle[i]]+circleStart[i];
+        bool isLeft = uniforms.rotations[circleAngle[i]]+circleStart[i] > radians(90) && uniforms.rotations[circleAngle[i]]+circleStart[i] < radians(270);
+        if(common_data.midiVelocities[circleAngle[i]] > 0 && ((isLeft && common_data.midiVelocities[4] > 0) || (!isLeft && common_data.midiVelocities[5] > 0)) ){
             startAngle += radians(180);
         }
 
@@ -123,7 +110,7 @@ void main() {
 
     }
 
-    if(getNote(6) > 0 && rand(iPosition) > 0.8){
+    if(common_data.midiVelocities[6] > 0 && rand(iPosition) > 0.8){
         d += vec3(dummy.r) * 0.5;
     }
 

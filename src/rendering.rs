@@ -41,7 +41,6 @@ use winit::{
     window::{Window},
 };
 use crate::midi::listen;
-use vs::PushConstants;
 
 use std::sync::{Arc, Mutex, RwLock};
 use vulkano::descriptor_set::layout::DescriptorSetLayout;
@@ -52,6 +51,7 @@ pub fn run(project : Arc<RwLock<Project>>) {
 
     let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(engine.device.clone()));
 
+    let common_uniform_register = Arc::new(Mutex::new(UniformRegister::new(memory_allocator.clone())));
     let uniform_register = Arc::new(Mutex::new(UniformRegister::new(memory_allocator.clone())));
 
     // We now create a buffer that will store the shape of our triangle. We use `#[repr(C)]` here
@@ -118,13 +118,6 @@ pub fn run(project : Arc<RwLock<Project>>) {
         fs = (f_project.frag_loader)(engine.device.clone()).unwrap();
     }
 
-    let push_constants = Arc::new(Mutex::new(PushConstants{
-        time: 0,
-        deltaTime: 0,
-        midiData: [0;8],
-        data: [0.0;22],
-    }));
-
     let midi_notes = Arc::new(Mutex::new([0;16]));
     let midi_velocities = Arc::new(Mutex::new([0;16]));
 
@@ -136,7 +129,7 @@ pub fn run(project : Arc<RwLock<Project>>) {
 
     // _conn_in needs to be a named parameter, because it needs to be kept alive until the end of the scope
     let mut _conn_in = listen(move | channel, note, velocity, |{
-        //println!("DEBUG : channel[{0}] : ({1},{2})",channel,note,velocity);
+        println!("DEBUG : channel[{0}] : ({1},{2})",channel,note,velocity);
 
         if channel >= 16 {
             return;
@@ -144,8 +137,8 @@ pub fn run(project : Arc<RwLock<Project>>) {
 
         let mut n = w_midi_notes.lock().unwrap();
         let mut v = w_midi_velocities.lock().unwrap();
-        n[channel] = note;
-        v[channel] = velocity;
+        n[channel] = note as u32;
+        v[channel] = velocity as u32;
     });
 
     let descriptor_set_allocator = StandardDescriptorSetAllocator::new(engine.device.clone());
@@ -226,17 +219,22 @@ pub fn run(project : Arc<RwLock<Project>>) {
             .boxed(),
     );
 
-    let r_vulkan_push_constants = push_constants.clone();
     let r_midi_notes = midi_notes.clone();
     let r_midi_velocities = midi_velocities.clone();
     let r_project = project.clone();
     let r_previous_time = previous_time.clone();
 
+    let r_common_uniform_register = common_uniform_register.clone();
     let r_uniform_register = uniform_register.clone();
 
 
     engine.event_loop.run(move |event, _, control_flow| {
         match event {
+            Event::LoopDestroyed {
+
+            } => {
+                println!("The End...")
+            }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
@@ -302,30 +300,23 @@ pub fn run(project : Arc<RwLock<Project>>) {
                 )
                     .unwrap();
 
-                let mut p = r_vulkan_push_constants.lock().unwrap().clone();
                 let tmp_elapsed_time = current_time.elapsed().as_millis() as u32;
                 let mut previous_time_l = r_previous_time.lock().unwrap();
-                p.deltaTime = tmp_elapsed_time - *previous_time_l;
-                *previous_time_l = tmp_elapsed_time;
-                p.time = tmp_elapsed_time;
 
                 let n = r_midi_notes.lock().unwrap().clone();
                 let v = r_midi_velocities.lock().unwrap().clone();
 
                 let pr = r_project.write().unwrap();
 
-                p.data[0] = dimensions.width as f32;
-                p.data[1] = dimensions.height as f32;
-
+                let mut l_common_uniform_register = r_common_uniform_register.lock().unwrap();
                 let mut l_uniform_register = r_uniform_register.lock().unwrap();
 
-                (pr.update)(p.time,p.deltaTime,n.clone(),v.clone(),&mut p.data, &mut *l_uniform_register);
+                let dt = tmp_elapsed_time - *previous_time_l;
+                *previous_time_l = tmp_elapsed_time;
+                let time = tmp_elapsed_time;
 
-                let bit_enc: [u32;4] = [1,255,65025,16581375];
-
-                for i in 0..7{
-                    p.midiData[i] = n[i*2] as u32 * bit_enc[0] + v[i*2] as u32 * bit_enc[1] + n[i*2+1] as u32 * bit_enc[2] + v[i*2+1] as u32 * bit_enc[3];
-                }
+                pr.fillCommonData(time,dt,dimensions.width,dimensions.height,n.clone(),v.clone(),&mut *l_common_uniform_register);
+                (pr.update)(time,dt,n.clone(),v.clone(), &mut *l_uniform_register);
 
                 let layout = pipeline.layout().set_layouts().get(0).unwrap();
 
@@ -336,11 +327,20 @@ pub fn run(project : Arc<RwLock<Project>>) {
                 )
                     .unwrap();
 
+
+                let layout_common : &Arc<DescriptorSetLayout>;
+                let mut set_common : Option<Arc<PersistentDescriptorSet>> = Option::None;
+
+                if l_common_uniform_register.has_uniform_data(){
+                    layout_common = pipeline.layout().set_layouts().get(1).unwrap();
+                    set_common = Option::Some(l_common_uniform_register.create_descriptor_set(&descriptor_set_allocator, layout_common.clone()));
+                }
+
                 let layout2 : &Arc<DescriptorSetLayout>;
                 let mut set2 : Option<Arc<PersistentDescriptorSet>> = Option::None;
 
                 if l_uniform_register.has_uniform_data(){
-                    layout2 = pipeline.layout().set_layouts().get(1).unwrap();
+                    layout2 = pipeline.layout().set_layouts().get(2).unwrap();
                     set2 = Option::Some(l_uniform_register.create_descriptor_set(&descriptor_set_allocator, layout2.clone()));
                 }
 
@@ -364,18 +364,25 @@ pub fn run(project : Arc<RwLock<Project>>) {
                         0,
                         set.clone(),
                     );
-
-                if set2.is_some(){
+                if set_common.is_some(){
                     builder.bind_descriptor_sets(
                         PipelineBindPoint::Graphics,
                         pipeline.layout().clone(),
                         1,
+                        set_common.unwrap().clone(),
+                    );
+                }
+                if set2.is_some(){
+                    builder.bind_descriptor_sets(
+                        PipelineBindPoint::Graphics,
+                        pipeline.layout().clone(),
+                        2,
                         set2.unwrap().clone(),
                     );
                 }
 
                 builder.bind_vertex_buffers(0, vertex_buffer.clone())
-                    .push_constants(pipeline.layout().clone(), 0, p)
+                    //.push_constants(pipeline.layout().clone(), 0, p)
                     .draw(vertex_buffer.len() as u32, 1, 0, 0)
                     .unwrap()
                     .end_render_pass()

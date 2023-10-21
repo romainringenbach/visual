@@ -25,7 +25,8 @@ impl Extension {
             let v = ((self.max_length - self.min_length)/self.extension_time) * utils::ease_out(self.cumulated_time/self.extension_time);
             self.length = f32::min(self.min_length + v, self.max_length);
             if self.length == self.max_length {
-                self.finished = true
+                self.finished = true;
+                self.length = 0.0;
             }
         }
     }
@@ -47,17 +48,8 @@ static EXTENSIONS : Lazy<Arc<Mutex<Vec<Extension>>>> = Lazy::new(||{Arc::new(Mut
         length: 0.0,
         cumulated_time: 0.0,
         min_length: 0.0,
-        max_length: 0.3,
-        extension_time: 0.5,
-        extension_type: 0,
-        finished: true,
-        position: Vec2 { x: 0.0, y: 0.0 },
-    }, Extension {
-        length: 0.0,
-        cumulated_time: 0.0,
-        min_length: 0.0,
         max_length: 0.5,
-        extension_time: 0.5,
+        extension_time: 0.9,
         extension_type: 0,
         finished: true,
         position: Vec2 { x: 0.0, y: 0.0 },
@@ -67,6 +59,15 @@ static EXTENSIONS : Lazy<Arc<Mutex<Vec<Extension>>>> = Lazy::new(||{Arc::new(Mut
         min_length: 0.0,
         max_length: 0.2,
         extension_time: 0.5,
+        extension_type: 4,
+        finished: true,
+        position: Vec2 { x: 0.0, y: 0.0 },
+    }, Extension {
+        length: 0.0,
+        cumulated_time: 0.0,
+        min_length: 0.0,
+        max_length: 0.3,
+        extension_time: 0.8,
         extension_type: 2,
         finished: true,
         position: Vec2 { x: 0.0, y: 0.0 },
@@ -76,7 +77,7 @@ static EXTENSIONS : Lazy<Arc<Mutex<Vec<Extension>>>> = Lazy::new(||{Arc::new(Mut
         min_length: 0.0,
         max_length: 0.1,
         extension_time: 0.5,
-        extension_type: 2,
+        extension_type: 3,
         finished: true,
         position: Vec2 { x: 0.0, y: 0.0 },
     }, Extension {
@@ -115,7 +116,7 @@ static OLD_CH_OFF: Lazy<Arc<Mutex<Vec<bool>>>> = Lazy::new(||{Arc::new(Mutex::ne
 
 static K: Lazy<Arc<Mutex<u8>>> = Lazy::new(||{Arc::new(Mutex::new(0))});
 
-create_project!("Project 3","src/project3/frag.glsl",|_time,delta_time, notes, _velocities, _data, uniform_register |{
+create_project!("Project 3","src/project3/frag.glsl",|_time,delta_time, notes, velocities, uniform_register |{
     // do nothing
     
     let mut extension_l = EXTENSIONS.lock().unwrap();
@@ -142,16 +143,16 @@ create_project!("Project 3","src/project3/frag.glsl",|_time,delta_time, notes, _
 
 
 
-        if notes[l] > 0 && l < 4 && extension_i.finished {
+        if velocities[l] > 0 && l < 4 && extension_i.finished {
             extension_i.reset();
             ch_off_l[l] = false;
         }
-        if notes[l] > 0 && l == 4 && i == 4+*k_l as usize && extension_i.finished {
+        if velocities[l] > 0 && l == 4 && i == 4+*k_l as usize && extension_i.finished {
             extension_i.reset();
             ch_off_l[l] = false;
         }
 
-        if notes[l] == 0 {
+        if velocities[l] == 0 {
             ch_off_l[l] = true;
         }
         i+= 1;

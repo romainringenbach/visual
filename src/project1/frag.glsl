@@ -4,19 +4,20 @@
 
 /*
     channels :
-        0 : "impulse" -> shader blinking
-        1 : "bass" -> baseSize * 2
-        2 : "verb_beep" -> baseSize * 0.5
+        2 : "impulse" -> shader blinking
+        0 : "bass" -> baseSize * 2
+        5 : "verb_beep" -> baseSize * 0.5
         3 : "high_tone" -> baseSize * 0.25
-        3 : "high_tone2" -> baseSize * 0.25
+        4 : "high_tone2" -> baseSize * 0.10
+        1 : "beep beep" -> baseSize * 0.75
 */
 
 const float baseSize = 0.1;
-float speed = 0.00001;
+const float sizeF[6] = {2.,1.0,1.0,0.25,0.1,1.0};
 
 void main() {
 
-    uint iTime = getTime();
+    uint iTime = common_data.time;
 
     float ya = 0;
     if(iPosition.y > 0.0){
@@ -24,27 +25,25 @@ void main() {
     }
 
     float sizeFactor = 1.0;
-    if(getNote(1) > 0){
-        sizeFactor = 4.0;
+    float speed = 0.00001;
+    float f = 1.0;
+
+    for(int i =0;i < 6; i++){
+        if(common_data.midiVelocities[i] > 0){
+            if(i == 2){
+                f = 0.0;
+            } else if(i == 5){
+                speed = 0.00005;
+            } else if(i == 1) {
+                speed = 0.000005;
+            } else {
+                sizeFactor = sizeF[i];
+            }
+        }
     }
+    float c = round(texture(tex,vec2(iTexCoord.x * baseSize / sizeFactor,iTime * speed + ya)).r) * f;
 
-    if(getNote(2) > 0){
-        speed = 0.00005;
-    }
+    //f_color = vec4(c,c,c,1);
 
-    if(getNote(3) > 0){
-        sizeFactor = 0.25;
-    }
-
-    if(getNote(4) > 0){
-        sizeFactor = 0.1;
-    }
-
-    float c = round(texture(tex,vec2(iTexCoord.x * baseSize / sizeFactor,iTime * speed + ya)).r);
-
-    if(getNote(0) > 0){
-        c = 0;
-    }
-
-    f_color = vec4(c,c,c,1);
+    f_color = checkMidi();
 }
