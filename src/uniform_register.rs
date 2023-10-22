@@ -20,12 +20,18 @@ pub struct UniformRegister {
 }
 
 impl UniformRegister {
-    pub fn new(memory_allocator : Arc<StandardMemoryAllocator>) -> Self{
+    pub fn new(memory_allocator : Arc<StandardMemoryAllocator>, isStorage: bool) -> Self{
+
+        let mut buffer_usage =   BufferUsage::UNIFORM_BUFFER;
+        if isStorage {
+            buffer_usage = BufferUsage::STORAGE_BUFFER;
+        }
+
         Self {
             allocator : SubbufferAllocator::new(
                 memory_allocator.clone(),
                 SubbufferAllocatorCreateInfo {
-                    buffer_usage: BufferUsage::UNIFORM_BUFFER,
+                    buffer_usage,
                     ..Default::default()
                 }),
             descriptor_writes: vec![].into(),

@@ -16,37 +16,26 @@ pub struct Project
 #[derive(BufferContents)]
 #[repr(C)]
 struct CommonData {
-    time: Padded<u32,12>,
-    deltaTime: Padded<u32,12>,
-    screenSize: Padded<[u32;2],8>,
-    midiNotes: [Padded<u32,12>;16],
-    midiVelocities: [Padded<u32,12>;16]
+    time: u32,
+    deltaTime: u32,
+    screenSize: [u32;2],
+    midiNotes: [u32;16],
+    midiVelocities: [u32;16]
 }
 
 impl Project {
     pub fn fillCommonData(&self,time:u32,delta_time:u32,screen_width:u32,screen_height:u32,midi_notes:[u32;16],midi_velocities: [u32;16], uniform_register: & mut UniformRegister){
 
-        let mut midiNotes: [Padded<u32,12>;16] = [Padded(0),Padded(0),Padded(0),Padded(0),Padded(0),Padded(0),Padded(0),Padded(0),Padded(0),Padded(0),Padded(0),Padded(0),Padded(0),Padded(0),Padded(0),Padded(0)];
-        let mut midiVelocities: [Padded<u32,12>;16] = midiNotes;
-
-        let mut i = 0;
-        for midi_note in midi_notes {
-            midiNotes[i] = Padded(midi_note);
-            i+=1;
-        }
-
-        i = 0;
-        for midi_velocity in midi_velocities {
-            midiVelocities[i] = Padded(midi_velocity);
-            i+=1;
-        }
+        //println!("Data {} {} {} {}",time,delta_time,screen_width,screen_height);
+        //println!("Notes : {:?}",midi_notes);
+        //println!("Velocities : {:?}",midi_velocities);
 
         let common_data = CommonData {
-            time: Padded(time),
-            deltaTime: Padded(delta_time),
-            screenSize: Padded([screen_width,screen_height]),
-            midiNotes,
-            midiVelocities,
+            time,
+            deltaTime: delta_time,
+            screenSize: [screen_width,screen_height],
+            midiNotes : midi_notes,
+            midiVelocities : midi_velocities,
         };
 
         uniform_register.register_uniform_data(common_data);

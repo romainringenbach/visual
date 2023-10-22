@@ -2,7 +2,7 @@
 
 #include <common.glsl>
 
-layout(set = 2, binding = 0) uniform Data {
+layout(set = 2, binding = 0) buffer Data {
     float rotations[4];
 } uniforms;
 
@@ -92,7 +92,7 @@ void main() {
     int circleIndex = -1;
     float startAngle = 0.0;
     for(int i = 0; i < 10 && !findCircle ; i++){
-        startAngle = uniforms.rotations[circleAngle[i]]+circleStart[i];
+        startAngle = circleStart[i]; // uniforms.rotations[circleAngle[i]]+
         bool isLeft = uniforms.rotations[circleAngle[i]]+circleStart[i] > radians(90) && uniforms.rotations[circleAngle[i]]+circleStart[i] < radians(270);
         if(common_data.midiVelocities[circleAngle[i]] > 0 && ((isLeft && common_data.midiVelocities[4] > 0) || (!isLeft && common_data.midiVelocities[5] > 0)) ){
             startAngle += radians(180);

@@ -94,12 +94,11 @@ create_project!("Project 2","src/project2/frag.glsl",|time,delta_time, notes, ve
 
     let delta_time_as_seconds = (delta_time as f32)/1000.0;
 
-    use vulkano::padded::Padded;
-    let mut data2 : [Padded<f32, 12>;4] = [Padded(0.),Padded(0.),Padded(0.),Padded(0.)];
+    let mut data2 : [f32;4] = [0.0,0.0,0.0,0.0];
     i = 0;
     for rotation_i in rotation_l.iter_mut(){
         rotation_i.update(delta_time_as_seconds);
-        data2[i] = Padded(rotation_i.rotation);
+        data2[i] = rotation_i.rotation;
         i+=1;
     }
 

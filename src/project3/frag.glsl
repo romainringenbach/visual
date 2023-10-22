@@ -2,7 +2,7 @@
 
 #include <common.glsl>
 
-layout(set = 2, binding = 0) uniform Data {
+layout(set = 2, binding = 0) buffer Data {
     vec4 circleData[7];
 } uniforms;
 

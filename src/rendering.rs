@@ -51,8 +51,8 @@ pub fn run(project : Arc<RwLock<Project>>) {
 
     let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(engine.device.clone()));
 
-    let common_uniform_register = Arc::new(Mutex::new(UniformRegister::new(memory_allocator.clone())));
-    let uniform_register = Arc::new(Mutex::new(UniformRegister::new(memory_allocator.clone())));
+    let common_uniform_register = Arc::new(Mutex::new(UniformRegister::new(memory_allocator.clone(), true)));
+    let uniform_register = Arc::new(Mutex::new(UniformRegister::new(memory_allocator.clone(), true)));
 
     // We now create a buffer that will store the shape of our triangle. We use `#[repr(C)]` here
     // to force rustc to use a defined layout for our data, as the default representation has *no
