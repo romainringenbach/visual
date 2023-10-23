@@ -1,8 +1,8 @@
 #![macro_use]
+
 use vulkano::device::Device;
 use std::sync::{Arc};
 use vulkano::buffer::BufferContents;
-use vulkano::padded::Padded;
 use vulkano::shader::{ShaderCreationError, ShaderModule};
 use crate::uniform_register::UniformRegister;
 
@@ -15,6 +15,7 @@ pub struct Project
 
 #[derive(BufferContents)]
 #[repr(C)]
+#[allow(non_snake_case)]
 struct CommonData {
     time: u32,
     deltaTime: u32,
@@ -24,7 +25,7 @@ struct CommonData {
 }
 
 impl Project {
-    pub fn fillCommonData(&self,time:u32,delta_time:u32,screen_width:u32,screen_height:u32,midi_notes:[u32;16],midi_velocities: [u32;16], uniform_register: & mut UniformRegister){
+    pub fn fill_common_data(&self,time:u32,delta_time:u32,screen_width:u32,screen_height:u32,midi_notes:[u32;16],midi_velocities: [u32;16], uniform_register: & mut UniformRegister){
 
         //println!("Data {} {} {} {}",time,delta_time,screen_width,screen_height);
         //println!("Notes : {:?}",midi_notes);

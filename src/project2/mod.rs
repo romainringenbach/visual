@@ -66,7 +66,7 @@ static ROTATION : Lazy<Arc<Mutex<Vec<Rotation>>>> = Lazy::new(||{Arc::new(Mutex:
 
 static CH_OFF: Lazy<Arc<Mutex<Vec<bool>>>> = Lazy::new(||{Arc::new(Mutex::new(vec![true,true,true,true]))});
 
-create_project!("Project 2","src/project2/frag.glsl",|time,delta_time, notes, velocities, uniform_register |{
+create_project!("Project 2","src/project2/frag.glsl",|time,delta_time, _notes, velocities, uniform_register |{
     // do nothing
     let _t = time;
     let _dt = delta_time;

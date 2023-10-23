@@ -1,9 +1,7 @@
-use std::collections::BTreeMap;
 use std::io::{stdin, stdout, Write};
-use std::sync::{Arc, Mutex,RwLock};
+use std::sync::{Arc,RwLock};
 use std::string::String;
 use crate::project::Project;
-use lazy_static::lazy_static;
 
 mod project;
 mod rendering;
@@ -34,11 +32,11 @@ fn main() {
         }
 
         print!("Please select project: ");
-        stdout().flush();
+        let _ = stdout().flush();
         let mut input = String::new();
-        stdin().read_line(&mut input);
+        let _ = stdin().read_line(&mut input);
         let entry = input.trim().parse::<usize>().unwrap();
-        if(entry < projects.len()) {
+        if entry < projects.len()  {
             rendering::run(projects[entry].clone());
         } else {
             println!("Invalid project selected -_-");

@@ -315,7 +315,7 @@ pub fn run(project : Arc<RwLock<Project>>) {
                 *previous_time_l = tmp_elapsed_time;
                 let time = tmp_elapsed_time;
 
-                pr.fillCommonData(time,dt,dimensions.width,dimensions.height,n.clone(),v.clone(),&mut *l_common_uniform_register);
+                pr.fill_common_data(time,dt,dimensions.width,dimensions.height,n.clone(),v.clone(),&mut *l_common_uniform_register);
                 (pr.update)(time,dt,n.clone(),v.clone(), &mut *l_uniform_register);
 
                 let layout = pipeline.layout().set_layouts().get(0).unwrap();

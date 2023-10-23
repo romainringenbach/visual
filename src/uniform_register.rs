@@ -20,10 +20,10 @@ pub struct UniformRegister {
 }
 
 impl UniformRegister {
-    pub fn new(memory_allocator : Arc<StandardMemoryAllocator>, isStorage: bool) -> Self{
+    pub fn new(memory_allocator : Arc<StandardMemoryAllocator>, is_storage: bool) -> Self{
 
         let mut buffer_usage =   BufferUsage::UNIFORM_BUFFER;
-        if isStorage {
+        if is_storage {
             buffer_usage = BufferUsage::STORAGE_BUFFER;
         }
 
