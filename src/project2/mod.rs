@@ -64,7 +64,9 @@ static ROTATION : Lazy<Arc<Mutex<Vec<Rotation>>>> = Lazy::new(||{Arc::new(Mutex:
 
 ))});
 
-static CH_OFF: Lazy<Arc<Mutex<Vec<bool>>>> = Lazy::new(||{Arc::new(Mutex::new(vec![true,true,true,true]))});
+static CH_OFF: Lazy<Arc<Mutex<Vec<bool>>>> = Lazy::new(||{Arc::new(Mutex::new(vec![true,true,true,true,true]))});
+
+static MOD_INDEX: Lazy<Arc<Mutex<i32>>> = Lazy::new(||{Arc::new(Mutex::new(-1))});
 
 create_project!("Project 2","src/project2/frag.glsl",|time,delta_time, _notes, velocities, uniform_register |{
     // do nothing
@@ -74,9 +76,11 @@ create_project!("Project 2","src/project2/frag.glsl",|time,delta_time, _notes, v
     let mut rotation_l = ROTATION.lock().unwrap();
     let mut ch_off_l = CH_OFF.lock().unwrap();
 
+    let real_velocities = [velocities[0],velocities[1],velocities[2],velocities[3]];
+
     let mut i = 0;
     for  rotation_i in rotation_l.iter_mut() {
-        if velocities[i] > 0 && ch_off_l[i] && rotation_i.rotation == rotation_i.wanted_rotation {
+        if real_velocities[i] > 0 && ch_off_l[i] && rotation_i.rotation == rotation_i.wanted_rotation {
             rotation_i.old_rotation = rotation_i.rotation;
             if i%2 == 0 {
                 rotation_i.wanted_rotation += rotation_i.rotation_delta;
@@ -85,11 +89,23 @@ create_project!("Project 2","src/project2/frag.glsl",|time,delta_time, _notes, v
             }
             rotation_i.cumulate_rotation_over_time = 0.0;
             ch_off_l[i] = false;
-        } else if velocities[i] == 0 {
+        } else if real_velocities[i] == 0 {
             ch_off_l[i] = true;
         }
 
         i+= 1;
+    }
+
+    let mut mod_index_l = MOD_INDEX.lock().unwrap();
+
+    if velocities[4] > 0 && ch_off_l[4] == false {
+        ch_off_l[4] = true;
+        *mod_index_l = (rand::random::<f32>() * 4.0).round() as i32;
+    }
+
+    if velocities[4] == 0 && ch_off_l[4] == true {
+        ch_off_l[4] = false;
+        *mod_index_l = -1;
     }
 
     let delta_time_as_seconds = (delta_time as f32)/1000.0;
@@ -98,7 +114,11 @@ create_project!("Project 2","src/project2/frag.glsl",|time,delta_time, _notes, v
     i = 0;
     for rotation_i in rotation_l.iter_mut(){
         rotation_i.update(delta_time_as_seconds);
-        data2[i] = rotation_i.rotation;
+        let mut a = 0.0;
+        if *mod_index_l >= 0 && i == *mod_index_l as usize {
+            a = 180.0;
+        }
+        data2[i] = rotation_i.rotation+a;
         i+=1;
     }
 

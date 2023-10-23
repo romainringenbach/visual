@@ -129,7 +129,7 @@ pub fn run(project : Arc<RwLock<Project>>) {
 
     // _conn_in needs to be a named parameter, because it needs to be kept alive until the end of the scope
     let mut _conn_in = listen(move | channel, note, velocity, |{
-        println!("DEBUG : channel[{0}] : ({1},{2})",channel,note,velocity);
+        //println!("DEBUG : channel[{0}] : ({1},{2})",channel,note,velocity);
 
         if channel >= 16 {
             return;

@@ -80,7 +80,7 @@ circlesThin[0]+circlesThin[1]+circlesThin[2]+circlesThin[3]+circlesThin[4]+circl
 circlesThin[0]+circlesThin[1]+circlesThin[2]+circlesThin[3]+circlesThin[4]+circlesThin[5]+circlesThin[6]+circlesThin[7]+circlesThin[8]+circlesThin[9]/2.0+circleSeparator*9.0};
 const float circleStart[10] = {0.0,radians(90),radians(135),radians(-90),0.0,radians(180),radians(45),radians(90),0.0,radians(180)};
 const float circleLength[10] = {radians(270),radians(90),radians(135),radians(90),radians(90),radians(180),radians(45),radians(90),radians(135),radians(180)};
-const int circleAngle[10] = {2,4,3,2,5,4,2,5,3,4};
+const int circleAngle[10] = {0,3,2,0,1,3,0,1,2,3};
 
 void main() {
 
@@ -92,11 +92,11 @@ void main() {
     int circleIndex = -1;
     float startAngle = 0.0;
     for(int i = 0; i < 10 && !findCircle ; i++){
-        startAngle = circleStart[i]; // uniforms.rotations[circleAngle[i]]+
+        startAngle = uniforms.rotations[circleAngle[i]]+circleStart[i];
         bool isLeft = uniforms.rotations[circleAngle[i]]+circleStart[i] > radians(90) && uniforms.rotations[circleAngle[i]]+circleStart[i] < radians(270);
-        if(common_data.midiVelocities[circleAngle[i]] > 0 && ((isLeft && common_data.midiVelocities[4] > 0) || (!isLeft && common_data.midiVelocities[5] > 0)) ){
+        /*if(common_data.midiVelocities[circleAngle[i]] > 0 && ((isLeft && common_data.midiVelocities[4] > 0) || (!isLeft && common_data.midiVelocities[5] > 0)) ){
             startAngle += radians(180);
-        }
+        }*/
 
         if(isInCircleArc(startAngle,circlesThin[i],circleLength[i],circleDistancesToCenter[i],iPosition,r)){
             findCircle = true;
@@ -109,11 +109,6 @@ void main() {
         d = vec3(1.0);
 
     }
-
-    if(common_data.midiVelocities[6] > 0 && rand(iPosition) > 0.8){
-        d += vec3(dummy.r) * 0.5;
-    }
-
 
     f_color = vec4(d,1.0);
 }
