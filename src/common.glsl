@@ -11,8 +11,19 @@ layout(set = 1, binding = 0) buffer CommonData {
     uint midiVelocities[16];
 } common_data;
 
+#define PI 3.14159265358979323846
+
 float rand(vec2 co){
     return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+// rotate element on  0..1:0..1 coordonates
+vec2 rotate2D (vec2 _st, float _angle) {
+    _st -= 0.5;
+    _st =  mat2(cos(_angle),-sin(_angle),
+    sin(_angle),cos(_angle)) * _st;
+    _st += 0.5;
+    return _st;
 }
 
 vec4 checkMidi(){

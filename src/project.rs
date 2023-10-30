@@ -56,7 +56,7 @@ macro_rules! create_project {
 
         use crate::project::Project;
         use once_cell::sync::Lazy;
-        use std::sync::{Arc,Mutex,RwLock};
+        use std::sync::{Arc,RwLock};
 
         pub static PROJECT : Lazy<Arc<RwLock<Project>>> = Lazy::new(||Arc::new(RwLock::new(Project {
             name: String::from($name),
