@@ -23,14 +23,14 @@ pub struct NumberAnimation {
     pub value: f32,
     pub from: f32,
     pub to: f32,
-    pub duration : f32,
-    cumulated_time : f32,
+    pub duration : u32,
+    cumulated_time : u32,
     pub finished : bool,
 }
 
 impl NumberAnimation {
 
-    pub fn new(from: f32, to: f32, duration : f32) -> Self {
+    pub fn new(from: f32, to: f32, duration : u32) -> Self {
         assert_ne!(from, to, "From and to have to be different from each other");
         assert_ne!(duration,0, "Duration have to be superior to 0");
         NumberAnimation {
@@ -38,15 +38,15 @@ impl NumberAnimation {
             from,
             to,
             duration,
-            cumulated_time: 0.0,
+            cumulated_time: 0,
             finished: true,
         }
     }
-    pub fn update(&mut self, delta_time : f32){
-        if self.to != self.value {
+    pub fn update(&mut self, delta_time : u32){
+        if !self.finished {
             self.cumulated_time += delta_time;
 
-            let v = ((self.to - self.from)/self.duration) * ease_out(self.cumulated_time/self.duration);
+            let v = (self.to - self.from) * ease_in_out((self.cumulated_time as f32)/(self.duration as f32));
             if self.from < self.to {
                 self.value = f32::min(self.from + v, self.to);
             } else {
@@ -60,7 +60,7 @@ impl NumberAnimation {
     }
 
     pub fn reset(&mut self){
-        self.cumulated_time = 0.0;
+        self.cumulated_time = 0;
         self.finished = false;
         self.value = self.from;
     }
@@ -73,7 +73,7 @@ pub struct MidiInfo {
     old_velocities : [u32;16],
 }
 
-pub const DEFAULT_CHANNEL_VALUES : [u32;16] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+pub const DEFAULT_CHANNEL_VALUES : [u32;16] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
 
 impl MidiInfo {
     pub fn new() -> Self {

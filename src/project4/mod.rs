@@ -30,32 +30,83 @@ struct Project4Data {
     color_inverted: bool,
     white_block_number : u32,
     black_block_number : u32,
-    white_block_time_count : f32,
-    black_block_time_count : f32
+    white_block_time_count : u32,
+    black_block_time_count : u32
 }
 
 static PROJECT_4_DATA : Lazy<Arc<Mutex<Project4Data>>> = Lazy::new(||{Arc::new(Mutex::new(Project4Data{
     midi_info: MidiInfo::new(),
-    zoom_animation: NumberAnimation::new(9.0,3.0,1000.0),
+    zoom_animation: NumberAnimation::new(6.0,3.0,500),
     main_rotation_direction: -1.0,
     sub_rotation_direction: 1.0,
     color_inverted: false,
     white_block_number: 0,
     black_block_number: 0,
-    white_block_time_count: 0.0,
-    black_block_time_count: 0.0,
+    white_block_time_count: 0,
+    black_block_time_count: 0,
 }))});
 
-create_project!("Project 4","src/project4/frag.glsl",|_time,_delta_time, notes, velocities, _uniform_register |{
+const BLOCK_TIME_ERASE : u32 = 300;
 
-    println!("Note / V : {} / {}", notes[0],velocities[0]);
+create_project!("Project 4","src/project4/frag.glsl",|_time,delta_time, notes, velocities, uniform_register |{
 
     let mut project_4_data_l = PROJECT_4_DATA.lock().unwrap();
 
     project_4_data_l.midi_info.update(notes,velocities);
 
-    if project_4_data_l.midi_info.note_changed(0) && project_4_data_l.midi_info.channel_is_on(0) {
+    if project_4_data_l.midi_info.velocity_changed(1) && project_4_data_l.midi_info.channel_is_on(1) {
         project_4_data_l.zoom_animation.reset();
     }
+
+    if project_4_data_l.zoom_animation.finished {
+        project_4_data_l.zoom_animation.value = project_4_data_l.zoom_animation.from;
+    }
+
+    project_4_data_l.zoom_animation.update(delta_time);
+
+    if project_4_data_l.midi_info.velocity_changed(0) && project_4_data_l.midi_info.channel_is_on(0) {
+        project_4_data_l.main_rotation_direction *= -1.0;
+    }
+
+    if project_4_data_l.midi_info.velocity_changed(2) && project_4_data_l.midi_info.channel_is_on(2) {
+        project_4_data_l.sub_rotation_direction *= -1.0;
+    }
+    if project_4_data_l.midi_info.velocity_changed(3) && project_4_data_l.midi_info.channel_is_on(3) {
+        project_4_data_l.color_inverted = !project_4_data_l.color_inverted;
+    }
+
+    if project_4_data_l.midi_info.velocity_changed(4) && project_4_data_l.midi_info.channel_is_on(4) {
+        project_4_data_l.white_block_number +=1;
+        project_4_data_l.white_block_time_count = 0;
+    }
+
+    project_4_data_l.white_block_time_count += delta_time;
+
+    if BLOCK_TIME_ERASE <= project_4_data_l.white_block_time_count {
+        project_4_data_l.white_block_number = 0;
+    }
+
+    if project_4_data_l.midi_info.velocity_changed(5) && project_4_data_l.midi_info.channel_is_on(5) {
+        project_4_data_l.black_block_number +=1;
+        project_4_data_l.black_block_time_count = 0;
+    }
+
+    project_4_data_l.black_block_time_count += delta_time;
+
+    if BLOCK_TIME_ERASE <= project_4_data_l.black_block_time_count {
+        project_4_data_l.black_block_number = 0;
+    }
+
+    let uniform_data = fs::Data {
+        zoomValue : project_4_data_l.zoom_animation.value,
+        mainRotationDirection : project_4_data_l.main_rotation_direction,
+        subRotationDirection : project_4_data_l.sub_rotation_direction,
+        colorInverted : project_4_data_l.color_inverted as u32,
+        whiteBlockNumber : project_4_data_l.white_block_number,
+        blackBlockNumber : project_4_data_l.black_block_number,
+    };
+    println!("Values : {} {} {} {} {} {}",project_4_data_l.zoom_animation.value,project_4_data_l.main_rotation_direction,project_4_data_l.sub_rotation_direction,project_4_data_l.color_inverted as u32,project_4_data_l.white_block_number,project_4_data_l.black_block_number);
+
+    uniform_register.register_uniform_data(uniform_data);
 
 });

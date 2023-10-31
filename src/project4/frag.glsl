@@ -2,6 +2,15 @@
 
 #include <common.glsl>
 
+layout(set = 2, binding = 0) buffer Data {
+    float zoomValue;
+    float mainRotationDirection;
+    float subRotationDirection;
+    uint colorInverted;
+    uint whiteBlockNumber;
+    uint blackBlockNumber;
+} uniforms;
+
 vec2 tile(vec2 _st,vec2 _zoom){
     _st *= _zoom;
     return fract(_st);
@@ -39,6 +48,23 @@ vec2 subTile(vec2 _st){
         //  Rotate cell 3 by 180 degrees
         _st = rotate2D(_st,PI);
     }
+    if(index == 0.0 && uniforms.whiteBlockNumber >= 1){
+        _st = vec2(1.0,1.0);
+    } else if(index == 1.0 && uniforms.whiteBlockNumber >= 2){
+        _st = vec2(1.0,1.0);
+    } else if(index == 2.0 && uniforms.whiteBlockNumber >= 3){
+        _st = vec2(1.0,1.0);
+    } else if(index == 3.0 && uniforms.whiteBlockNumber >= 4){
+        _st = vec2(1.0,1.0);
+    } else if(index == 0.0 && uniforms.blackBlockNumber >= 1){
+        _st = vec2(0.0,0.0);
+    } else if(index == 1.0 && uniforms.blackBlockNumber >= 2){
+        _st = vec2(0.0,0.0);
+    } else if(index == 2.0 && uniforms.blackBlockNumber >= 3){
+        _st = vec2(0.0,0.0);
+    } else if(index == 3.0 && uniforms.blackBlockNumber >= 4){
+        _st = vec2(0.0,0.0);
+    }
 
     return _st;
 }
@@ -54,14 +80,22 @@ void main() {
 
     st.y *= float(common_data.screenSize.y) / float(common_data.screenSize.x);
 
-    st = rotate2D(st,-PI*time*speed);
-    st = tile(st,vec2(3.0,3.0));
+    st = rotate2D(st,uniforms.mainRotationDirection*PI*time*speed);
+    st = tile(st,vec2(uniforms.zoomValue));
 
-    st = rotate2D(st,PI*time*speed);
+    st = rotate2D(st,uniforms.subRotationDirection*PI*time*speed);
     st = subTile(st);
-    st = rotate2D(st,-PI*time*speed);
-    st = rotate2D(st,PI*time*speed);
+    st = rotate2D(st,-uniforms.subRotationDirection*PI*time*speed);
+    st = rotate2D(st,-uniforms.mainRotationDirection*PI*time*speed);
 
+    float c = step(st.x,st.y);
+    if(uniforms.colorInverted > 0){
+        if(c == 1.0){
+            c = 0.0;
+        } else {
+            c = 1.0;
+        }
+    }
 
-    f_color = vec4(vec3(step(st.x,st.y)),1);
+    f_color = vec4(vec3(c),1);
 }
