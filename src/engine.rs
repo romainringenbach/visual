@@ -13,6 +13,7 @@ use vulkano::{
     },
     VulkanLibrary,
 };
+use vulkano::device::Features;
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::swapchain::Surface;
 use vulkano_win::{VkSurfaceBuild};
@@ -67,7 +68,7 @@ impl Engine {
             .expect("no suitable physical device found");
     }
 
-    pub fn init_device_and_queue(physical_device : &Arc<PhysicalDevice>, device_extensions : &DeviceExtensions ,queue_family_index: u32) -> (Arc<Device>, Arc<Queue>) {
+    pub fn init_device_and_queue(physical_device : &Arc<PhysicalDevice>, device_extensions : &DeviceExtensions, device_features: &Features ,queue_family_index: u32) -> (Arc<Device>, Arc<Queue>) {
         let (device,mut queues) = Device::new(
             // Which physical device to connect to.
             physical_device.clone(),
@@ -85,6 +86,8 @@ impl Engine {
                     queue_family_index,
                     ..Default::default()
                 }],
+
+                enabled_features : device_features.clone(),
 
                 ..Default::default()
             },
@@ -117,7 +120,7 @@ impl Engine {
                     min_image_count: surface_capabilities.min_image_count,
                     image_format,
                     image_extent: window.inner_size().into(),
-                    image_usage: ImageUsage::COLOR_ATTACHMENT,
+                    image_usage: ImageUsage::TRANSFER_DST | ImageUsage::COLOR_ATTACHMENT,
                     composite_alpha: surface_capabilities
                         .supported_composite_alpha
                         .into_iter()
@@ -147,12 +150,22 @@ impl Engine {
         let surface = WindowBuilder::new()
             .build_vk_surface(&event_loop, instance.clone())
             .unwrap();
+        let minimal_features = Features {
+            sample_rate_shading: true,
+            ..Features::empty()
+        };
+
         let device_extensions = DeviceExtensions {
             khr_swapchain: true,
             ..DeviceExtensions::empty()
         };
         let ( physical_device, queue_family_index) = Self::init_physical_device(&instance,&device_extensions,&surface);
-        let (device, queue) = Self::init_device_and_queue(&physical_device,&device_extensions,queue_family_index);
+
+        if !physical_device.supported_features().contains(&minimal_features) {
+            panic!("The physical device is not good enough for this application.");
+        }
+
+        let (device, queue) = Self::init_device_and_queue(&physical_device,&device_extensions, &minimal_features,queue_family_index);
 
         let (swapchain, images) = Self::init_swapchain(&device,&surface);
 

@@ -43,8 +43,21 @@ use winit::{
 use crate::midi::listen;
 
 use std::sync::{Arc, Mutex, RwLock};
+use std::time::Duration;
 use vulkano::descriptor_set::layout::DescriptorSetLayout;
+use vulkano::device::{Device, DeviceOwned};
+use vulkano::image::{AttachmentImage, SampleCount};
+use vulkano::pipeline::graphics::multisample::MultisampleState;
+use vulkano::shader::ShaderModule;
+use winit::dpi::PhysicalSize;
 use crate::uniform_register::UniformRegister;
+
+#[derive(BufferContents, Vertex)]
+#[repr(C)]
+struct MyVertex {
+    #[format(R32G32_SFLOAT)]
+    position: [f32; 2],
+}
 
 pub fn run(project : Arc<RwLock<Project>>) {
     let mut engine = Engine::new();
@@ -57,24 +70,19 @@ pub fn run(project : Arc<RwLock<Project>>) {
     // We now create a buffer that will store the shape of our triangle. We use `#[repr(C)]` here
     // to force rustc to use a defined layout for our data, as the default representation has *no
     // guarantees*.
-    #[derive(BufferContents, Vertex)]
-    #[repr(C)]
-    struct Vertex {
-        #[format(R32G32_SFLOAT)]
-        position: [f32; 2],
-    }
+
 
     let vertices = [
-        Vertex {
+        MyVertex {
             position: [-1.0, -1.0],
         },
-        Vertex {
+        MyVertex {
             position: [-1.0, 1.0],
         },
-        Vertex {
+        MyVertex {
             position: [1.0, -1.0],
         },
-        Vertex {
+        MyVertex {
             position: [1.0, 1.0],
         },
     ];
@@ -92,19 +100,40 @@ pub fn run(project : Arc<RwLock<Project>>) {
     )
         .unwrap();
 
+    // In this example, we are going to perform the *resolve* (ie. turning a multisampled image
+    // into a non-multisampled one) as part of the render pass. This is the preferred method of
+    // doing so, as it the advantage that the Vulkan implementation doesn't have to write the
+    // content of the multisampled image back to memory at the end.
     let render_pass = vulkano::single_pass_renderpass!(
         engine.device.clone(),
         attachments: {
-            color: {
+            // The first framebuffer attachment is the intermediary image.
+            intermediary: {
                 load: Clear,
+                store: DontCare,
+                format: engine.swapchain.image_format(),
+                // This has to match the image definition.
+                samples: 4,
+            },
+            // The second framebuffer attachment is the final image.
+            color: {
+                load: DontCare,
                 store: Store,
                 format: engine.swapchain.image_format(),
+                // Same here, this has to match.
                 samples: 1,
             },
         },
         pass: {
-            color: [color],
+            // When drawing, we have only one output which is the intermediary image.
+            color: [intermediary],
             depth_stencil: {},
+            // The `resolve` array here must contain either zero entry (if you don't use
+            // multisampling), or one entry per color attachment. At the end of the pass, each
+            // color attachment will be *resolved* into the given image. In other words, here, at
+            // the end of the pass, the `intermediary` attachment will be copied to the attachment
+            // named `color`.
+            resolve: [color],
         },
     )
         .unwrap();
@@ -188,15 +217,8 @@ pub fn run(project : Arc<RwLock<Project>>) {
     )
         .unwrap();
 
-    let pipeline = GraphicsPipeline::start()
-        .render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
-        .vertex_input_state(Vertex::per_vertex())
-        .input_assembly_state(InputAssemblyState::new().topology(PrimitiveTopology::TriangleStrip))
-        .vertex_shader(vs.entry_point("main").unwrap(), ())
-        .viewport_state(ViewportState::viewport_dynamic_scissor_irrelevant())
-        .fragment_shader(fs.entry_point("main").unwrap(), ())
-        .build(engine.device.clone())
-        .unwrap();
+
+
 
 
     let mut viewport = Viewport {
@@ -205,7 +227,7 @@ pub fn run(project : Arc<RwLock<Project>>) {
         depth_range: 0.0..1.0,
     };
 
-    let mut framebuffers = window_size_dependent_setup(&engine.images, render_pass.clone(), &mut viewport);
+    let (mut pipeline, mut framebuffers) = window_size_dependent_setup(&engine.images, render_pass.clone(), &mut viewport, memory_allocator.clone(),engine.swapchain.image_format(),&vs,&fs);
     let command_buffer_allocator =
         StandardCommandBufferAllocator::new(engine.device.clone(), Default::default());
 
@@ -270,10 +292,13 @@ pub fn run(project : Arc<RwLock<Project>>) {
 
                     engine.swapchain = new_swapchain;
 
-                    framebuffers = window_size_dependent_setup(
+                    (pipeline, framebuffers) = window_size_dependent_setup(
                         &new_images,
                         render_pass.clone(),
                         &mut viewport,
+                        memory_allocator.clone(),
+                        engine.swapchain.image_format(),
+                        &vs,&fs
                     );
 
                     recreate_swapchain = false;
@@ -347,7 +372,7 @@ pub fn run(project : Arc<RwLock<Project>>) {
                 builder
                     .begin_render_pass(
                         RenderPassBeginInfo {
-                            clear_values: vec![Some([0.0, 0.0, 1.0, 1.0].into())],
+                            clear_values: vec![Some([0.0, 0.0, 1.0, 1.0].into()), None],
 
                             ..RenderPassBeginInfo::framebuffer(
                                 framebuffers[image_index as usize].clone(),
@@ -382,7 +407,6 @@ pub fn run(project : Arc<RwLock<Project>>) {
                 }
 
                 builder.bind_vertex_buffers(0, vertex_buffer.clone())
-                    //.push_constants(pipeline.layout().clone(), 0, p)
                     .draw(vertex_buffer.len() as u32, 1, 0, 0)
                     .unwrap()
                     .end_render_pass()
@@ -426,24 +450,62 @@ fn window_size_dependent_setup(
     images: &[Arc<SwapchainImage>],
     render_pass: Arc<RenderPass>,
     viewport: &mut Viewport,
-) -> Vec<Arc<Framebuffer>> {
+    memory_allocator: Arc<StandardMemoryAllocator>,
+    format: Format,
+    vs: &ShaderModule,
+    fs: &ShaderModule,
+) -> (Arc<GraphicsPipeline>, Vec<Arc<Framebuffer>>) {
     let dimensions = images[0].dimensions().width_height();
     viewport.dimensions = [dimensions[0] as f32, dimensions[1] as f32];
 
-    images
+    // Creating our intermediate multisampled image.
+    //
+    // As explained in the introduction, we pass the same dimensions and format as for the final
+    // image. But we also pass the number of samples-per-pixel, which is 4 here.
+    let intermediary = ImageView::new_default(
+        AttachmentImage::transient_multisampled(
+            &memory_allocator,
+            dimensions,
+            SampleCount::Sample4,
+            format,
+        )
+            .unwrap(),
+    )
+        .unwrap();
+
+    let framebuffers = images
         .iter()
         .map(|image| {
+
             let view = ImageView::new_default(image.clone()).unwrap();
             Framebuffer::new(
                 render_pass.clone(),
                 FramebufferCreateInfo {
-                    attachments: vec![view],
+                    attachments: vec![intermediary.clone(),view],
                     ..Default::default()
                 },
             )
                 .unwrap()
         })
-        .collect::<Vec<_>>()
+        .collect::<Vec<_>>();
+
+    let subpass = Subpass::from(render_pass.clone(), 0).unwrap();
+    let pipeline = GraphicsPipeline::start()
+        .multisample_state(MultisampleState {
+            rasterization_samples: subpass.num_samples().unwrap(),
+            sample_shading: Option::Some(1.0),
+            ..Default::default()
+        })
+        .render_pass(subpass)
+        .vertex_input_state(MyVertex::per_vertex())
+        .input_assembly_state(InputAssemblyState::new().topology(PrimitiveTopology::TriangleStrip))
+        .vertex_shader(vs.entry_point("main").unwrap(), ())
+        .viewport_state(ViewportState::viewport_dynamic_scissor_irrelevant())
+        .fragment_shader(fs.entry_point("main").unwrap(), ())
+        .build(memory_allocator.device().clone())
+        .unwrap();
+
+    (pipeline, framebuffers)
 }
 
 mod vs {
