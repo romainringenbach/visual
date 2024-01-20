@@ -69,8 +69,10 @@ impl NumberAnimation {
 pub struct MidiInfo {
     notes : [u32;16],
     velocities : [u32;16],
+    are_off : [u32;16],
     old_notes : [u32;16],
     old_velocities : [u32;16],
+    old_are_off : [u32;16],
 }
 
 pub const DEFAULT_CHANNEL_VALUES : [u32;16] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
@@ -80,8 +82,10 @@ impl MidiInfo {
         MidiInfo {
             notes : DEFAULT_CHANNEL_VALUES,
             velocities : DEFAULT_CHANNEL_VALUES,
+            are_off: DEFAULT_CHANNEL_VALUES,
             old_notes : DEFAULT_CHANNEL_VALUES,
-            old_velocities : DEFAULT_CHANNEL_VALUES
+            old_velocities : DEFAULT_CHANNEL_VALUES,
+            old_are_off: DEFAULT_CHANNEL_VALUES,
         }
     }
 
@@ -90,6 +94,10 @@ impl MidiInfo {
         self.old_velocities = self.velocities;
         self.notes = notes;
         self.velocities = velocities;
+        self.old_are_off = self.are_off;
+        for i in 0..16 {
+            self.are_off[i] = !self.channel_is_on(i) as u32;
+        }
     }
 
     pub fn note_changed(&self, ch : usize) -> bool {
@@ -104,7 +112,12 @@ impl MidiInfo {
 
     pub fn channel_is_on(&self, ch : usize) -> bool {
         assert!(ch >= 0 && ch < 16, "Channel is outside of range [0..16], value : {}", ch);
-        return self.notes[ch] > 0 && self.velocities[ch] > 0;
+        return self.velocities[ch] > 0;
+    }
+
+    pub fn channel_off_changed(&self, ch : usize) -> bool {
+        assert!(ch >= 0 && ch < 16, "Channel is outside of range [0..16], value : {}", ch);
+        return self.are_off[ch] != self.old_are_off[ch];
     }
 }
 

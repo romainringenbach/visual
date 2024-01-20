@@ -18,10 +18,11 @@ mod project1;
 mod project2;
 mod project3;
 mod project4;
+mod project5;
 
 fn main() {
 
-    let projects :Vec<Arc<RwLock<Project>>> = vec![project1::PROJECT.clone(), project2::PROJECT.clone(), project3::PROJECT.clone(), project4::PROJECT.clone()];
+    let projects :Vec<Arc<RwLock<Project>>> = vec![project1::PROJECT.clone(), project2::PROJECT.clone(), project3::PROJECT.clone(), project4::PROJECT.clone(),project5::PROJECT.clone()];
 
     if projects.len() == 1 {
         println!("Choosing the only available project: {}", projects[0].read().unwrap().name);
